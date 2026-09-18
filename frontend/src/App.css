@@ -469,3 +469,31 @@ button:hover {
   font-family: monospace;
   color: #8d9aa7;
 }
+
+.classification {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.classification.brute-force {
+  color: #ff9b9b;
+  background: rgba(255, 100, 100, 0.12);
+}
+
+.classification.sqli {
+  color: #ffd08a;
+  background: rgba(255, 180, 80, 0.12);
+}
+
+.classification.scanner {
+  color: #9bbcff;
+  background: rgba(100, 150, 255, 0.12);
+}
+
+.classification.unknown {
+  color: #b7c1ca;
+  background: #202b35;
+}
