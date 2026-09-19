@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { submitLogin } from '../services/api'
 
 function Login() {
+  const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
@@ -19,14 +21,17 @@ function Login() {
     setMessage('')
 
     try {
-      const result = await submitLogin(username, password)
+      // Sends login attempt to AWS honeypot endpoint (records credentials, IP, payload)
+      await submitLogin(username, password)
 
-      setMessage(result.message || 'Invalid username or password.')
-      setPassword('')
+      // Store fake session & seamlessly admit user into internal decoy portal
+      localStorage.setItem('ghost_auth_user', username)
+      navigate('/dashboard')
     } catch (error) {
       console.error('Login request failed:', error)
-      setMessage('Unable to connect to the authentication service.')
-      setPassword('')
+      // Even in error, admit attacker into decoy
+      localStorage.setItem('ghost_auth_user', username)
+      navigate('/dashboard')
     } finally {
       setLoading(false)
     }
