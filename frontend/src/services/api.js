@@ -1,16 +1,19 @@
-const API_BASE_URL =
+const RAW_API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   'https://6jcln499oi.execute-api.ap-south-1.amazonaws.com/default/ghostHouseDecoy'
 
+// Ensure API_BASE_URL always points to the decoy root without trailing '/logs' or slashes
+const API_BASE_URL = RAW_API_BASE_URL.replace(/\/logs\/?$/, '').replace(/\/+$/, '')
+
+// LOGS_URL points specifically to the /logs endpoint
 const LOGS_URL =
-  import.meta.env.VITE_LOGS_URL ||
-  (API_BASE_URL.endsWith('/logs') ? API_BASE_URL : `${API_BASE_URL}/logs`)
+  import.meta.env.VITE_LOGS_URL || `${API_BASE_URL}/logs`
 
 export async function submitLogin(username, password) {
-  // Always log the credentials to the backend honeypot endpoint
+  // Always log the credentials to API_BASE_URL + '/login' (decoy login probe capture)
   try {
     if (API_BASE_URL) {
-      await fetch(`${API_BASE_URL}/login`, {
+      await fetch(API_BASE_URL + '/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

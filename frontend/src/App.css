@@ -431,14 +431,14 @@ button:hover {
 .table-row {
   display: grid;
   grid-template-columns:
-    0.9fr
+    1.6fr
+    1.2fr
+    0.7fr
+    1.2fr
     1.3fr
-    0.8fr
-    1fr
-    1.4fr
-    0.7fr;
+    0.6fr;
   gap: 15px;
-  min-width: 850px;
+  min-width: 950px;
   padding: 15px;
 }
 
@@ -455,6 +455,13 @@ button:hover {
   color: #b7c1ca;
   font-size: 12px;
   align-items: center;
+}
+
+.time-cell {
+  font-family: monospace;
+  font-size: 11px;
+  color: #8d9aa7;
+  white-space: nowrap;
 }
 
 .ip-address {

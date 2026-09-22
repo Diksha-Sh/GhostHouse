@@ -137,7 +137,10 @@ function formatTime(value) {
     return String(value)
   }
 
-  return date.toLocaleTimeString([], {
+  return date.toLocaleString([], {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -195,7 +198,13 @@ function Monitor() {
       const records = await getSecurityEvents()
 
       if (records && records.length > 0) {
-        setEvents(records.map(normalizeEvent))
+        // Sort chronologically descending (newest events first)
+        const sortedRecords = [...records].sort((a, b) => {
+          const timeA = new Date(a.timestamp || a.time || a.createdAt || a.created_at || 0).getTime()
+          const timeB = new Date(b.timestamp || b.time || b.createdAt || b.created_at || 0).getTime()
+          return timeB - timeA
+        })
+        setEvents(sortedRecords.map(normalizeEvent))
         setUsingDemoData(false)
       } else if (records && records.length === 0 && usingDemoData) {
         // Keep demo data active if user explicitly toggled it
@@ -219,6 +228,7 @@ function Monitor() {
   }, [usingDemoData])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadEvents()
   }, [loadEvents])
 
@@ -532,7 +542,7 @@ function Monitor() {
         {/* Events Table */}
         <div className="monitor-table">
           <div className="table-header">
-            <span>Time</span>
+            <span>Timestamp</span>
             <span>IP Address</span>
             <span>Method</span>
             <span>Target Route</span>
@@ -555,7 +565,7 @@ function Monitor() {
               onClick={() => setSelectedEvent(event)}
               title="Click to inspect full event details"
             >
-              <span>{event.time}</span>
+              <span className="time-cell">{event.time}</span>
 
               <span className="ip-address">{event.ip}</span>
 
