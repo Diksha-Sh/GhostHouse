@@ -150,7 +150,7 @@ function Dashboard() {
           <div className="service-health-card">
             <div className="service-meta">
               <h4>Amazon API Gateway v2</h4>
-              <p>HTTP API • Greed Proxy • 1.44ms latency</p>
+              <p>HTTP API • Greed Proxy</p>
             </div>
             <span className="status-chip active">Active</span>
           </div>

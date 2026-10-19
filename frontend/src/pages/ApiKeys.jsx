@@ -209,11 +209,12 @@ function ApiKeys() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <span style={{ fontSize: '26px' }}>⚠️</span>
           <div>
-            <h4 style={{ fontSize: '14px', color: '#fde68a', marginBottom: '4px' }}>
+            <h4 style={{ fontSize: '14px', color: '#fde68a', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               CANARY CREDENTIAL DECEPTION INSTRUMENTATION
+              <span style={{ fontSize: '10px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '2px 6px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase' }}>Demo Only</span>
             </h4>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-              All API keys displayed in this console are synthetic decoy tokens monitored by Ghost House threat detection. Any authentication attempt using these keys triggers real-time alerts on the SOC Security Monitor.
+              [Demo Only] All API keys displayed in this console are synthetic decoy tokens for interface presentation. In this build, authentication attempts against these specific keys are not wired to active alerts on the SOC Security Monitor.
             </p>
           </div>
         </div>

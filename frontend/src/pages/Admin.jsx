@@ -69,7 +69,10 @@ function Admin() {
         <div className="settings-list">
           <div className="setting-item">
             <div className="setting-info">
-              <h4>WAF Adaptive Threat Deception Mode</h4>
+              <h4>
+                WAF Adaptive Threat Deception Mode
+                <span style={{ fontSize: '10px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase' }}>Demo Only</span>
+              </h4>
               <p>Return simulated database errors (SQLi) and synthetic permission errors (Traversal) instead of standard blocks</p>
             </div>
             <label className="toggle-switch">
@@ -84,7 +87,10 @@ function Admin() {
 
           <div className="setting-item">
             <div className="setting-info">
-              <h4>Sliding-Window Velocity Tracking</h4>
+              <h4>
+                Sliding-Window Velocity Tracking
+                <span style={{ fontSize: '10px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase' }}>Demo Only</span>
+              </h4>
               <p>Trigger brute force classification on clients exceeding 5 requests within a 30-second window</p>
             </div>
             <label className="toggle-switch">
@@ -99,7 +105,10 @@ function Admin() {
 
           <div className="setting-item">
             <div className="setting-info">
-              <h4>Artificial Network Latency Injection</h4>
+              <h4>
+                Artificial Network Latency Injection (600 ms)
+                <span style={{ fontSize: '10px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase' }}>Demo Only</span>
+              </h4>
               <p>Add 600 ms simulated network propagation delay to mimic enterprise authentication clusters</p>
             </div>
             <label className="toggle-switch">
@@ -129,7 +138,10 @@ function Admin() {
 
           <div className="setting-item">
             <div className="setting-info">
-              <h4>Strict IAM Multi-Factor Authentication (MFA)</h4>
+              <h4>
+                Strict IAM Multi-Factor Authentication (MFA)
+                <span style={{ fontSize: '10px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase' }}>Demo Only</span>
+              </h4>
               <p>Require hardware security keys or TOTP for all elevated cloud infrastructure roles</p>
             </div>
             <label className="toggle-switch">
@@ -144,7 +156,10 @@ function Admin() {
 
           <div className="setting-item">
             <div className="setting-info">
-              <h4>Emergency Maintenance Mode</h4>
+              <h4>
+                Emergency Maintenance Mode
+                <span style={{ fontSize: '10px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.4)', padding: '2px 6px', borderRadius: '4px', marginLeft: '8px', fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase' }}>Demo Only</span>
+              </h4>
               <p>Reject all non-administrative ingress traffic with HTTP 503 Service Unavailable</p>
             </div>
             <label className="toggle-switch">

