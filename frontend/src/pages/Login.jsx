@@ -40,11 +40,6 @@ function Login() {
     }
   }
 
-  const handleAutofillDemo = () => {
-    setUsername('admin@internal.ghosthouse.cloud')
-    setPassword('GhostHouse#Prod2026!')
-    setMessage('')
-  }
 
   return (
     <div className="login-page">
@@ -147,14 +142,7 @@ function Login() {
             {loading ? 'AUTHENTICATING ENCRYPTED SESSION...' : 'SIGN IN TO PORTAL'}
           </button>
 
-          <button
-            type="button"
-            className="quick-autofill-btn"
-            onClick={handleAutofillDemo}
-            title="Pre-populate with sample admin credentials for quick testing"
-          >
-            ⚡ Pre-fill Sample Admin Credentials
-          </button>
+
         </form>
 
         {message && <p className="login-message" style={{ color: '#fda4af', marginTop: '12px', fontSize: '12px' }}>{message}</p>}
